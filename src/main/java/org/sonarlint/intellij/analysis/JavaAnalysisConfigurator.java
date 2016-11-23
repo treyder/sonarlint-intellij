@@ -24,11 +24,13 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.EffectiveLanguageLevelUtil;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.CompilerModuleExtension;
+import com.intellij.openapi.roots.JdkOrderEntry;
 import com.intellij.openapi.roots.LibraryOrderEntry;
 import com.intellij.openapi.roots.ModuleOrderEntry;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.OrderEntry;
 import com.intellij.openapi.roots.OrderRootType;
+import com.intellij.openapi.roots.PersistentOrderRootType;
 import com.intellij.openapi.roots.libraries.Library;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -148,6 +150,9 @@ public class JavaAnalysisConfigurator implements AnalysisConfigurator {
     final ModuleRootManager mrm = ModuleRootManager.getInstance(module);
     final OrderEntry[] orderEntries = mrm.getOrderEntries();
     for (final OrderEntry entry : orderEntries) {
+      if (!entry.isValid()) {
+        continue;
+      }
       if (entry instanceof ModuleOrderEntry) {
         // Add dependent module output dir as library
         Module dependentModule = ((ModuleOrderEntry) entry).getModule();
@@ -157,11 +162,9 @@ public class JavaAnalysisConfigurator implements AnalysisConfigurator {
             found.add(output);
           }
         }
-      } else if (entry instanceof LibraryOrderEntry) {
-        Library lib = ((LibraryOrderEntry) entry).getLibrary();
-        if (lib != null) {
-          Collections.addAll(found, lib.getFiles(OrderRootType.CLASSES));
-        }
+      } else if (entry instanceof JdkOrderEntry || entry instanceof LibraryOrderEntry) {
+        VirtualFile[] jdkClasses = entry.getFiles(OrderRootType.CLASSES);
+        Collections.addAll(found, jdkClasses);
       }
     }
     return found.toArray(new VirtualFile[found.size()]);
