@@ -22,7 +22,10 @@ package org.sonarlint.intellij.core;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.components.ApplicationComponent;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.DirectoryStream;
@@ -32,10 +35,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.jar.JarOutputStream;
+import java.util.jar.Pack200;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import org.jetbrains.annotations.NotNull;
 import org.sonarlint.intellij.util.GlobalLogOutput;
 import org.sonarsource.sonarlint.core.ConnectedSonarLintEngineImpl;
@@ -97,11 +105,40 @@ public class SonarLintEngineFactory extends ApplicationComponent.Adapter {
       throw new IllegalStateException("Couldn't find plugins");
     }
 
+    URL[] pluginsList;
     if ("file".equalsIgnoreCase(pluginsDir.toURI().getScheme())) {
-
-      return getPluginsUrls(pluginsDir);
+      pluginsList = getPluginsUrls(pluginsDir);
     } else {
-      return getPluginsUrlsWithFs(pluginsDir);
+      pluginsList = getPluginsUrlsWithFs(pluginsDir);
+    }
+
+    Path p = Files.createTempDirectory("plugins");
+    return unpackPlugins(pluginsList, p);
+  }
+
+  private static URL[] unpackPlugins(URL[] plugins, Path dir) {
+    System.out.println("Unpacking " + plugins.length + " plugins");
+    long l = System.currentTimeMillis();
+    URL[] urls = Arrays.stream(plugins)
+      .map(p -> unpack200(p, dir))
+      .toArray(URL[]::new);
+    System.out.println(System.currentTimeMillis() - l);
+    return urls;
+  }
+
+  private static URL unpack200(URL packed, Path dir) {
+    String filename = Paths.get(packed.getFile()).getFileName().toString();
+    filename = filename.substring(0, filename.length() - "pack.gz".length() - 1) + "jar";
+    Path jarPath = dir.resolve(filename);
+    Pack200.Unpacker unpacker = Pack200.newUnpacker();
+    try {
+      try (JarOutputStream jarStream = new JarOutputStream(Files.newOutputStream(jarPath));
+        InputStream in = new GZIPInputStream(packed.openStream())) {
+        unpacker.unpack(in, jarStream);
+      }
+      return jarPath.toUri().toURL();
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
     }
   }
 
@@ -116,7 +153,7 @@ public class SonarLintEngineFactory extends ApplicationComponent.Adapter {
   private URL[] getPluginsUrls(URL pluginsDir) throws IOException, URISyntaxException {
     List<URL> pluginsUrls = new ArrayList<>();
 
-    try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(Paths.get(pluginsDir.toURI()), "*.jar")) {
+    try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(Paths.get(pluginsDir.toURI()), "*.pack.gz")) {
       for (Path path : directoryStream) {
         globalLogOutput.log("Found plugin: " + path.getFileName().toString(), LogOutput.Level.DEBUG);
 

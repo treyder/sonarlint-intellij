@@ -21,6 +21,7 @@ package org.sonarlint.intellij.config.global;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.DialogWrapper;
@@ -51,6 +52,7 @@ import org.sonarsource.sonarlint.core.client.api.connected.ServerConfiguration;
 import static javax.swing.JList.VERTICAL;
 
 public class OrganizationSelector extends DialogWrapper {
+  private static final Logger LOGGER = Logger.getInstance(OrganizationSelector.class);
   private final SonarQubeServer server;
   private JBList orgList;
   private String selectedOrganizationKey;
@@ -121,6 +123,7 @@ public class OrganizationSelector extends DialogWrapper {
         List<RemoteOrganization> orgs = impl.listOrganizations(serverConfiguration, null);
         ApplicationManager.getApplication().invokeLater(() -> setResults(orgs), ModalityState.stateForComponent(panel));
       } catch (Exception e) {
+        LOGGER.warn("Failed to download list of organizations", e);
         ApplicationManager.getApplication().invokeLater(() -> {
           Messages.showMessageDialog(panel, "Please check your server configuration: " + e.getMessage(),
             "Failed to Download List of Organizations", Messages.getWarningIcon());

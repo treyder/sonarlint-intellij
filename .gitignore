@@ -1,5 +1,5 @@
 src/main/resources/plugins/*.jar
-
+src/main/resources/plugins/*.pack.gz
 # ---- Sonar
 .sonar
 

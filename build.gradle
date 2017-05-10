@@ -89,18 +89,40 @@ dependencies {
   )
 }
 
-task cleanSQPlugins(type: Delete) {
-  delete fileTree('src/main/resources/plugins').include('**/*.jar')
-}
 
-task downloadSQPlugins(type: Copy, dependsOn: cleanSQPlugins) {
+
+task downloadSQPlugins(type: Copy) {
+  ext.dir = new File(this.buildDir, "plugins")
+  delete fileTree(dir)
   outputs.upToDateWhen { false }
   from configurations.sqplugins
+  into dir
+}
+
+task packSQPlugins(dependsOn: downloadSQPlugins) {
+  doLast {
+    def jarFiles = fileTree(downloadSQPlugins.dir).include('*.jar')
+    jarFiles.each { jar ->
+      def name = jar.absolutePath.substring(0, jar.absolutePath.length() - 4)
+      def packedName = name + ".pack.gz"
+      exec {
+        commandLine('pack200', packedName, jar)
+      }
+    }
+  }
+}
+
+task cleanSQPlugins(type: Delete) {
+  delete fileTree('src/main/resources/plugins').include('**/*.jar', '**/*.gz')
+}
+
+task copySQPlugins(type: Copy, dependsOn: [cleanSQPlugins, packSQPlugins]) {
+  from downloadSQPlugins.dir
+  include "*.pack.gz"
   into 'src/main/resources/plugins'
 }
 
-
-classes.dependsOn downloadSQPlugins
+classes.dependsOn copySQPlugins
 
 release {
   failOnSnapshotDependencies = false
@@ -112,8 +134,6 @@ sonarqube {
     property 'sonar.projectName', 'SonarLint for IntelliJ IDEA'
   }
 }
-
-
 
 license {
   mapping {
