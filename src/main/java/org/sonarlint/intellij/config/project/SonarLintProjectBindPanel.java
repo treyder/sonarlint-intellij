@@ -314,7 +314,7 @@ public class SonarLintProjectBindPanel implements Disposable {
   }
 
   private void createBindPanel() {
-    Border b = IdeBorderFactory.createTitledBorder("Project binding");
+    Border b = IdeBorderFactory.createTitledBorder("CUSTOM: Project binding");
 
     bindPanel = new JPanel(new GridBagLayout());
     bindPanel.setBorder(b);
